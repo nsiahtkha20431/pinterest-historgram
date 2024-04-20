@@ -35,7 +35,7 @@ async function scrapePinterestBoard(pinterestBoardURL) {
 
     while (openedPinsCount < 10) {
         await page.waitForSelector(pinLinkSelector, { visible: true });
-        const pinLinks = await page.$$(pinLinkSelector);
+        let pinLinks = await page.$$(pinLinkSelector);
 
         for (const pinLink of pinLinks) {
             const href = await (await pinLink.getProperty('href')).jsonValue();
@@ -44,14 +44,18 @@ async function scrapePinterestBoard(pinterestBoardURL) {
 
             const pinPage = await browser.newPage();
             await pinPage.goto(href, { waitUntil: 'networkidle0', timeout: 10000 });
-
+            
+            const pageSource = await pinPage.evaluate(() => document.documentElement.outerHTML);
             const imagePath = await downloadImageFromPin(pinPage, '.hCL.kVc.L4E', baseDirectory, openedPinsCount + 1);
 
             if (imagePath) {
-                // Store metadata only if the image was successfully downloaded
+                const htmlFilePath = path.join(baseDirectory, `pin-${openedPinsCount + 1}.html`);
+                fs.writeFileSync(htmlFilePath, pageSource);
+
                 metadata.push({
                     id: `pin-${openedPinsCount + 1}`,
-                    imageFilePath: imagePath
+                    imageFilePath: imagePath,
+                    htmlFilePath: htmlFilePath
                 });
             }
 
@@ -60,6 +64,15 @@ async function scrapePinterestBoard(pinterestBoardURL) {
             await pinPage.close();
             openedPinsCount++;
             if (openedPinsCount >= 10) break; // Stop when 10 pins have been processed
+
+            if (openedPinsCount % 4 === 0) {  // Scroll after every 4 pins
+                await page.evaluate('window.scrollBy(0, window.innerHeight)');
+                await page.waitForTimeout(2000);  // Wait for lazy-loaded images to load
+                // Refresh the list of pinLinks
+                pinLinks = await page.$$(pinLinkSelector);
+            }
+
+            if (openedPinsCount >= 10) break;
         }
 
         // Check if we've reached the desired number of processed pins

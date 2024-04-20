@@ -3,21 +3,6 @@ const fs = require('fs');
 const https = require('https');
 const path = require('path');
 
-async function downloadImage(url, filepath) {
-    return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
-            if (res.statusCode === 200) {
-                res.pipe(fs.createWriteStream(filepath))
-                  .on('error', reject)
-                  .once('close', () => resolve(filepath));
-            } else {
-                res.resume(); // Consume response data to free up memory
-                reject(new Error(`Request Failed With a Status Code: ${res.statusCode}`));
-            }
-        });
-    });
-}
-
 async function scrapePinterestBoard(url) {
     const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
@@ -27,7 +12,7 @@ async function scrapePinterestBoard(url) {
     let openedPinsCount = 0;
     let processedHrefs = new Set();
 
-    while (openedPinsCount < 5) {
+    while (openedPinsCount < 1) {
         await page.waitForSelector(pinLinkSelector, { visible: true });
         const pinLinks = await page.$$(pinLinkSelector);
 
