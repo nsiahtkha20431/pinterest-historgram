@@ -21,6 +21,29 @@ async function downloadImageFromPin(page, pinSelector, baseDirectory, pinId) {
     return imagePath; // Return the image path for use in metadata
 }
 
+function extractCreatedAtFromJSON(htmlContent) {
+    const $ = cheerio.load(htmlContent);
+    const scriptContent = $('script[data-relay-response="true"]').html();
+    try {
+        const jsonData = JSON.parse(scriptContent);
+        const createdAtRFC2822 = jsonData.response.data.v3GetPinQuery.data.createdAt;
+        const date = new Date(createdAtRFC2822);
+
+        // Format the date as "DD MMM YYYY"
+        const formattedDate = date.toLocaleDateString('en-GB', {
+            day: '2-digit',   // two digit day
+            month: 'short',  // abbreviated month
+            year: 'numeric'  // four digit year
+        });
+
+        return formattedDate;  // Returns date in the format "17 Apr 2024"
+    } catch (error) {
+        console.error("Failed to parse JSON data or extract 'createdAt'", error);
+        return null;  // Return null if parsing fails
+    }
+}
+
+
 async function scrapePinterestBoard(pinterestBoardURL) {
     const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
@@ -31,7 +54,7 @@ async function scrapePinterestBoard(pinterestBoardURL) {
     let processedHrefs = new Set();
     const baseDirectory = path.join(__dirname, 'pins');
     const metadata = [];
-    fs.mkdirSync(baseDirectory, { recursive: true }); // Ensure the directory exists
+    fs.mkdirSync(baseDirectory, { recursive: true });
 
     while (openedPinsCount < 10) {
         await page.waitForSelector(pinLinkSelector, { visible: true });
@@ -44,18 +67,18 @@ async function scrapePinterestBoard(pinterestBoardURL) {
 
             const pinPage = await browser.newPage();
             await pinPage.goto(href, { waitUntil: 'networkidle0', timeout: 10000 });
-            
+
             const pageSource = await pinPage.evaluate(() => document.documentElement.outerHTML);
+            const createdAt = extractCreatedAtFromJSON(pageSource);  // Extract createdAt using the new function
+
             const imagePath = await downloadImageFromPin(pinPage, '.hCL.kVc.L4E', baseDirectory, openedPinsCount + 1);
 
             if (imagePath) {
-                const htmlFilePath = path.join(baseDirectory, `pin-${openedPinsCount + 1}.html`);
-                fs.writeFileSync(htmlFilePath, pageSource);
 
                 metadata.push({
                     id: `pin-${openedPinsCount + 1}`,
                     imageFilePath: imagePath,
-                    htmlFilePath: htmlFilePath
+                    createdAt: createdAt  
                 });
             }
 
@@ -63,23 +86,18 @@ async function scrapePinterestBoard(pinterestBoardURL) {
 
             await pinPage.close();
             openedPinsCount++;
-            if (openedPinsCount >= 10) break; // Stop when 10 pins have been processed
+            if (openedPinsCount >= 10) break;
 
-            if (openedPinsCount % 4 === 0) {  // Scroll after every 4 pins
+            if (openedPinsCount % 4 === 0) {
                 await page.evaluate('window.scrollBy(0, window.innerHeight)');
-                await page.waitForTimeout(2000);  // Wait for lazy-loaded images to load
-                // Refresh the list of pinLinks
+                await page.waitForTimeout(2000);
                 pinLinks = await page.$$(pinLinkSelector);
             }
-
-            if (openedPinsCount >= 10) break;
         }
 
-        // Check if we've reached the desired number of processed pins
         if (openedPinsCount >= 10) break;
     }
 
-    // Save metadata to JSON
     fs.writeFileSync(path.join(baseDirectory, 'metadata.json'), JSON.stringify(metadata, null, 4));
 
     await browser.close();
