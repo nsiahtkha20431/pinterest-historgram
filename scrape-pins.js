@@ -1,22 +1,6 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
-const https = require('https');
 const path = require('path');
-
-async function downloadImage(url, filepath) {
-    return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
-            if (res.statusCode === 200) {
-                res.pipe(fs.createWriteStream(filepath))
-                  .on('error', reject)
-                  .once('close', () => resolve(filepath));
-            } else {
-                res.resume(); // Consume response data to free up memory
-                reject(new Error(`Request Failed With a Status Code: ${res.statusCode}`));
-            }
-        });
-    });
-}
 
 async function scrapePinterestBoard(url) {
     const browser = await puppeteer.launch({ headless: false });
@@ -26,8 +10,10 @@ async function scrapePinterestBoard(url) {
     const pinLinkSelector = 'a[href*="/pin/"]';
     let openedPinsCount = 0;
     let processedHrefs = new Set();
+    const baseDirectory = path.join(__dirname, 'downloaded-html-sources'); // Base directory for saving files
+    fs.mkdirSync(baseDirectory, { recursive: true }); // Ensure the directory exists
 
-    while (openedPinsCount < 5) {
+    while (openedPinsCount < 10) {
         await page.waitForSelector(pinLinkSelector, { visible: true });
         const pinLinks = await page.$$(pinLinkSelector);
 
@@ -42,24 +28,20 @@ async function scrapePinterestBoard(url) {
             const pinPage = await browser.newPage();
             await pinPage.goto(href, {
                 waitUntil: 'networkidle0',
-                timeout: 10000 // Timeout in milliseconds, e.g., 10000 for 10 seconds
+                timeout: 10000 // Timeout in milliseconds
             });
-
-            // If you know a specific element that appears after the dynamic content is loaded, use it here
-            // await pinPage.waitForSelector("created_at", { visible: true });
 
             const pageSource = await pinPage.evaluate(() => document.documentElement.outerHTML);
 
-            // Overwrite the same file with the page source of the current pin
-            const sourceFilePath = path.join(__dirname, 'temp-pin-source.html');
+            // Create a unique file path for each pin
+            const fileName = `pin-source-${openedPinsCount + 1}.html`;
+            const sourceFilePath = path.join(baseDirectory, fileName);
             fs.writeFileSync(sourceFilePath, pageSource);
-            console.log(`Page source of current pin saved to ${sourceFilePath}`);
-
-            // Regular expression and extraction logic for 'created_at' can be added here
-            // ...
+            console.log(`Page source of pin ${openedPinsCount + 1} saved to ${sourceFilePath}`);
 
             await pinPage.close();
             openedPinsCount++;
+            if (openedPinsCount >= 5) break;
         }
     }
 
