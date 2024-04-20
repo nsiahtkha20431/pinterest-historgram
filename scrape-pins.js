@@ -3,11 +3,22 @@ const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 
-async function downloadImage(page, imageUrl, imagePath) {
+async function downloadImageFromPin(page, pinSelector, baseDirectory, pinId) {
+    const htmlContent = await page.content();
+    const $ = cheerio.load(htmlContent);
+    const imageUrl = $(pinSelector).attr('src');
+
+    if (!imageUrl) {
+        console.log('Image URL not found for pin:', pinId);
+        return;
+    }
+
     console.log('Attempting to download image from URL:', imageUrl);
     const imageResponse = await page.goto(imageUrl);
     const buffer = await imageResponse.buffer();
+    const imagePath = path.join(baseDirectory, `pin-${pinId}.jpg`);
     fs.writeFileSync(imagePath, buffer);
+    return imagePath; // Return the image path for use in metadata
 }
 
 async function scrapePinterestBoard(pinterestBoardURL) {
@@ -31,33 +42,28 @@ async function scrapePinterestBoard(pinterestBoardURL) {
             if (processedHrefs.has(href)) continue;
             processedHrefs.add(href);
 
-            const pinPage = await browser.newPage(); //opens new tab
-            await pinPage.goto(href, { waitUntil: 'networkidle0', timeout: 10000 }); // navigate to pin's url
-            const htmlContent = await pinPage.content(); // retrieves html content
-            const $ = cheerio.load(htmlContent); // loads html content into cheerio for parsing
+            const pinPage = await browser.newPage();
+            await pinPage.goto(href, { waitUntil: 'networkidle0', timeout: 10000 });
 
-            // Extract createdAt and imageUrl (modify selectors as per actual HTML)
-            const createdAt = $('#createdAtSelector').text();  // Modify selector based on actual HTML
-            const imageUrl = $('#imageSelector').attr('src');   // Modify selector based on actual HTML
+            const imagePath = await downloadImageFromPin(pinPage, '.hCL.kVc.L4E', baseDirectory, openedPinsCount + 1);
 
-            // Save image
-            const imageFileName = `pin-${openedPinsCount + 1}.jpg`;
-            const imagePath = path.join(baseDirectory, imageFileName);
-            await downloadImage(pinPage, imageUrl, imagePath);
-
-            // Store metadata
-            metadata.push({
-                id: `pin-${openedPinsCount + 1}`,
-                createdAt: createdAt,
-                imageFilePath: imagePath
-            });
+            if (imagePath) {
+                // Store metadata only if the image was successfully downloaded
+                metadata.push({
+                    id: `pin-${openedPinsCount + 1}`,
+                    imageFilePath: imagePath
+                });
+            }
 
             console.log(`Processed pin ${openedPinsCount + 1}`);
 
             await pinPage.close();
             openedPinsCount++;
-            if (openedPinsCount >= 5) break; // Your limit condition
+            if (openedPinsCount >= 10) break; // Stop when 10 pins have been processed
         }
+
+        // Check if we've reached the desired number of processed pins
+        if (openedPinsCount >= 10) break;
     }
 
     // Save metadata to JSON
