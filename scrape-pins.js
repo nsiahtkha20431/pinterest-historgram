@@ -43,6 +43,16 @@ function extractCreatedAtFromJSON(htmlContent) {
     }
 }
 
+function runCLIPModel(imagePath) {
+    exec(`python clip_script.py "${imagePath}"`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Execution error: ${error}`);
+            return;
+        }
+        console.log(`Style Prediction: ${stdout}`); // Output from Python script
+    });
+}
+
 async function scrapePinterestBoard(pinterestBoardURL) {
     const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
@@ -89,7 +99,8 @@ async function scrapePinterestBoard(pinterestBoardURL) {
 
             if (openedPinsCount % 4 === 0) {
                 await page.evaluate('window.scrollBy(0, window.innerHeight)');
-                await page.waitForTimeout(2000);
+                // await page.waitForTimeout(2000);
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 pinLinks = await page.$$(pinLinkSelector);
             }
         }
