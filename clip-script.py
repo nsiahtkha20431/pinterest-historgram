@@ -8,7 +8,7 @@ model, preprocess = clip.load("ViT-B/32", device=device)
 image_path = "C:\\Users\\Admin\\Desktop\\pinterest-histogram\\pintrest-sample-images\\vintage-sample.jpg"
 image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
 
-text = clip.tokenize(["chic style", "goth style", "kawaii style"]).to(device)
+text = clip.tokenize(["chic style", "goth style", "kawaii style", "vintage style"]).to(device)
 
 with torch.no_grad():
     image_features = model.encode_image(image)
@@ -19,4 +19,3 @@ with torch.no_grad():
 
 print("Label probs:", probs)  # prints: [[0.9927937  0.00421068 0.00299572]]
 
-#how do i run this script?
