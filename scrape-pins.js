@@ -43,7 +43,6 @@ function extractCreatedAtFromJSON(htmlContent) {
     }
 }
 
-
 async function scrapePinterestBoard(pinterestBoardURL) {
     const browser = await puppeteer.launch({ headless: false });
     const page = await browser.newPage();
