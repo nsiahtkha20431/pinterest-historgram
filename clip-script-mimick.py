@@ -1,11 +1,12 @@
 import sys
 import json
+import random
 
 def mock_clip(image_path):
-    # Mock response: probabilities for each style
+    # List of styles
     styles = ["chic style", "goth style", "kawaii style", "vintage style"]
-    # Simulating a high probability for "goth style"
-    probs = [0.05, 0.85, 0.05, 0.05]
+    # Random probabilities for each style
+    probs = random.sample([0.85, 0.05, 0.05, 0.05], k=4)
 
     # Creating a dictionary to mimic the structure of the CLIP output
     response = {style: prob for style, prob in zip(styles, probs)}

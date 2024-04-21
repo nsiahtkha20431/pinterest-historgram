@@ -2,6 +2,7 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
+const { exec } = require('child_process');
 
 async function downloadImageFromPin(page, pinSelector, baseDirectory, pinId) {
     const htmlContent = await page.content();
@@ -44,12 +45,26 @@ function extractCreatedAtFromJSON(htmlContent) {
 }
 
 function runCLIPModel(imagePath) {
-    exec(`python clip_script.py "${imagePath}"`, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Execution error: ${error}`);
-            return;
-        }
-        console.log(`Style Prediction: ${stdout}`); // Output from Python script
+    return new Promise((resolve, reject) => {
+        exec(`python "${path.join(__dirname, 'clip-script-mimick.py')}" "${imagePath}"`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Execution error: ${error}`);
+                return reject(error);
+            }
+            if (stderr) {
+                console.error(`Error: ${stderr}`);
+                return reject(stderr);
+            }
+            console.log(`Style Prediction: ${stdout}`);
+            try {
+                const predictions = JSON.parse(stdout);
+                const dominantStyle = Object.keys(predictions).reduce((a, b) => predictions[a] > predictions[b] ? a : b);
+                resolve(dominantStyle);
+            } catch (parseError) {
+                console.error('Failed to parse output:', parseError);
+                reject(parseError);
+            }
+        });
     });
 }
 
@@ -78,20 +93,19 @@ async function scrapePinterestBoard(pinterestBoardURL) {
             await pinPage.goto(href, { waitUntil: 'networkidle0', timeout: 10000 });
 
             const pageSource = await pinPage.evaluate(() => document.documentElement.outerHTML);
-            const createdAt = extractCreatedAtFromJSON(pageSource);  // Extract createdAt using the new function
-
+            const createdAt = extractCreatedAtFromJSON(pageSource);  
             const imagePath = await downloadImageFromPin(pinPage, '.hCL.kVc.L4E', baseDirectory, openedPinsCount + 1);
 
             if (imagePath) {
-
+                const dominantStyle = await runCLIPModel(imagePath); // Wait for the dominant style prediction
                 metadata.push({
                     id: `pin-${openedPinsCount + 1}`,
                     imageFilePath: imagePath,
-                    createdAt: createdAt  
+                    createdAt: createdAt,
+                    style: dominantStyle
                 });
+                console.log(`Processed pin ${openedPinsCount + 1} with style ${dominantStyle}`);
             }
-
-            console.log(`Processed pin ${openedPinsCount + 1}`);
 
             await pinPage.close();
             openedPinsCount++;
@@ -99,7 +113,6 @@ async function scrapePinterestBoard(pinterestBoardURL) {
 
             if (openedPinsCount % 4 === 0) {
                 await page.evaluate('window.scrollBy(0, window.innerHeight)');
-                // await page.waitForTimeout(2000);
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 pinLinks = await page.$$(pinLinkSelector);
             }
@@ -109,9 +122,9 @@ async function scrapePinterestBoard(pinterestBoardURL) {
     }
 
     fs.writeFileSync(path.join(baseDirectory, 'metadata.json'), JSON.stringify(metadata, null, 4));
-
     await browser.close();
 }
+
 
 const boardUrl = 'https://www.pinterest.ca/krazikhan/fashion/';
 scrapePinterestBoard(boardUrl);
