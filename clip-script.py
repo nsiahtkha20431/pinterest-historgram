@@ -1,21 +1,28 @@
+import sys
+import json
 import torch
 import clip
 from PIL import Image
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = clip.load("ViT-B/32", device=device)
+def run_clip(image_path):
+    device = "cuda" if torch.cuda.is_available() else "cpu" # determines whether to run on gpu or cpu
+    model, preprocess = clip.load("ViT-B/32", device=device) # load model and preprocessing tool
 
-image_path = "C:\\Users\\Admin\\Desktop\\pinterest-histogram\\pintrest-sample-images\\vintage-sample.jpg"
-image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
+    image = preprocess(Image.open(image_path)).unsqueeze(0).to(device) # open image and preprocess
+    text = clip.tokenize(["chic style", "goth style", "kawaii style", "vintage style"]).to(device) # converts a list of style descriptions into a tensor of tokenized text suitable for the CLIP model
 
-text = clip.tokenize(["chic style", "goth style", "kawaii style", "vintage style"]).to(device)
+    with torch.no_grad():
+        logits_per_image, _ = model(image, text)
+        probs = logits_per_image.softmax(dim=-1).cpu().numpy()[0]
 
-with torch.no_grad():
-    image_features = model.encode_image(image)
-    text_features = model.encode_text(text)
-    
-    logits_per_image, logits_per_text = model(image, text)
-    probs = logits_per_image.softmax(dim=-1).cpu().numpy()
+    styles = ["chic style", "goth style", "kawaii style", "vintage style"]
+    max_idx = probs.argmax()
+    dominant_style = styles[max_idx]
 
-print("Label probs:", probs)  # prints: [[0.9927937  0.00421068 0.00299572]]
+    return dominant_style
+
+if __name__ == "__main__":
+    image_path = sys.argv[1]  # Get image path from command-line argument
+    result = run_clip(image_path)
+    print(result)  # Print the dominant style
 

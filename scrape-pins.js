@@ -46,7 +46,7 @@ function extractCreatedAtFromJSON(htmlContent) {
 
 function runCLIPModel(imagePath) {
     return new Promise((resolve, reject) => {
-        exec(`python "${path.join(__dirname, 'clip-script-mimick.py')}" "${imagePath}"`, (error, stdout, stderr) => {
+        exec(`python "${path.join(__dirname, 'clip-script.py')}" "${imagePath}"`, (error, stdout, stderr) => { //executes command in shell: running clip-script with the image path as argument
             if (error) {
                 console.error(`Execution error: ${error}`);
                 return reject(error);
@@ -57,8 +57,7 @@ function runCLIPModel(imagePath) {
             }
             console.log(`Style Prediction: ${stdout}`);
             try {
-                const predictions = JSON.parse(stdout);
-                const dominantStyle = Object.keys(predictions).reduce((a, b) => predictions[a] > predictions[b] ? a : b);
+                const dominantStyle = stdout.trim(); // Since stdout includes a newline at the end
                 resolve(dominantStyle);
             } catch (parseError) {
                 console.error('Failed to parse output:', parseError);
