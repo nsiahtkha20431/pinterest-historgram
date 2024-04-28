@@ -11,8 +11,12 @@
   "license": "ISC",
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.4.5",
     "fs": "^0.0.1-security",
     "https": "^1.0.0",
-    "path": "^0.12.7"
+    "node-plotly": "^1.0.0",
+    "path": "^0.12.7",
+    "plotly.js-basic-dist": "^2.31.1",
+    "puppeteer": "^22.6.5"
   }
 }
