@@ -57,7 +57,9 @@ function generateChart(data) {
     });
 }
 
-const filePath = path.join(__dirname, 'pins', 'metadata.json');
-const data = loadData(filePath);
-const chartData = prepareChartData(data);
-generateChart(chartData);
+// const filePath = path.join(__dirname, 'pins', 'metadata.json');
+// const data = loadData(filePath);
+// const chartData = prepareChartData(data);
+// generateChart(chartData);
+
+module.exports = { loadData, prepareChartData, generateChart };
