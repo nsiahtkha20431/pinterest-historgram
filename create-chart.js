@@ -1,6 +1,8 @@
+require('dotenv').config();
+
 const fs = require('fs');
 const path = require('path');
-const plotly = require('plotly.js-basic-dist');
+const plotly = require('plotly')(process.env.PLOTLY_USERNAME, process.env.PLOTLY_API_KEY);
 
 // Function to load and parse the JSON data
 function loadData(filePath) {
@@ -55,7 +57,7 @@ function generateChart(data) {
     });
 }
 
-const filePath = path.join(__dirname, 'metadata.json');
+const filePath = path.join(__dirname, 'pins', 'metadata.json');
 const data = loadData(filePath);
 const chartData = prepareChartData(data);
 generateChart(chartData);
