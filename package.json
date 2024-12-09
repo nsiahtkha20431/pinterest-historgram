@@ -15,6 +15,7 @@
     "fs": "^0.0.1-security",
     "https": "^1.0.0",
     "node-plotly": "^1.0.0",
+    "open": "^10.1.0",
     "path": "^0.12.7",
     "plotly": "^1.0.6",
     "plotly.js-basic-dist": "^2.31.1",

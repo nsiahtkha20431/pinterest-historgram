@@ -9,13 +9,21 @@ def run_clip(image_path):
     model, preprocess = clip.load("ViT-B/32", device=device) # load model and preprocessing tool
 
     image = preprocess(Image.open(image_path)).unsqueeze(0).to(device) # open image and preprocess
-    text = clip.tokenize(["chic style", "goth style", "kawaii style", "vintage style"]).to(device) # converts a list of style descriptions into a tensor of tokenized text suitable for the CLIP model
-
+    text = clip.tokenize(["chic style", "goth style", "kawaii style", "vintage style", "punk style", "avante-garde style", "grunge style", "emo style"]).to(device)
     with torch.no_grad():
         logits_per_image, _ = model(image, text)
         probs = logits_per_image.softmax(dim=-1).cpu().numpy()[0]
 
-    styles = ["chic style", "goth style", "kawaii style", "vintage style"]
+    styles = [
+        "chic style", 
+        "goth style", 
+        "kawaii style", 
+        "vintage style",
+        "punk style",
+        "avante-garde style",
+        "grunge style",
+        "emo style"
+    ]
     max_idx = probs.argmax()
     dominant_style = styles[max_idx]
 
