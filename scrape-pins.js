@@ -81,7 +81,7 @@ async function scrapePinterestBoard(pinterestBoardURL) {
     const metadata = [];
     fs.mkdirSync(baseDirectory, { recursive: true });
 
-    while (openedPinsCount < 100) {
+    while (openedPinsCount < 10) {
         await page.waitForSelector(pinLinkSelector, { visible: true });
         let pinLinks = await page.$$(pinLinkSelector);
 
@@ -110,7 +110,7 @@ async function scrapePinterestBoard(pinterestBoardURL) {
 
             await pinPage.close();
             openedPinsCount++;
-            if (openedPinsCount >= 100) break;
+            if (openedPinsCount >= 10) break;
 
             if (openedPinsCount % 4 === 0) {
                 await page.evaluate('window.scrollBy(0, window.innerHeight)');
@@ -119,7 +119,7 @@ async function scrapePinterestBoard(pinterestBoardURL) {
             }
         }
 
-        if (openedPinsCount >= 100) break;
+        if (openedPinsCount >= 10) break;
     }
 
     fs.writeFileSync(path.join(baseDirectory, 'metadata.json'), JSON.stringify(metadata, null, 4));
