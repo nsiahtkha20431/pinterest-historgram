@@ -59,6 +59,9 @@ function StyleTrendsChart({ data }) {
     const [chartData, setChartData] = React.useState([]);
     const [yearlyTotals, setYearlyTotals] = React.useState([]);
     const [activePoint, setActivePoint] = React.useState(null);
+    const [activeStyles, setActiveStyles] = React.useState([]);
+    const [activeYear, setActiveYear] = React.useState(null);
+    const [yearlyStyleBreakdowns, setYearlyStyleBreakdowns] = React.useState({});
 
     React.useEffect(() => {
         const processData = () => {
@@ -67,6 +70,53 @@ function StyleTrendsChart({ data }) {
                 date,
                 ...styles,
             }));
+
+            // Determine which styles actually have data
+            const allStyles = new Set();
+            chartData.forEach(entry => {
+                Object.entries(entry).forEach(([key, value]) => {
+                    if (key !== 'date' && value > 0) {
+                        allStyles.add(key);
+                    }
+                });
+            });
+            setActiveStyles(Array.from(allStyles));
+
+            // Calculate detailed yearly breakdowns
+            const breakdowns = {};
+            Object.entries(styleCountsByDate).forEach(([date, styles]) => {
+                const year = date.split(' ')[2];
+                if (!breakdowns[year]) {
+                    breakdowns[year] = {};
+                    Object.keys(styles).forEach(style => {
+                        if (allStyles.has(style)) {  // Only track styles that exist in data
+                            breakdowns[year][style] = 0;
+                        }
+                    });
+                }
+                Object.entries(styles).forEach(([style, count]) => {
+                    if (style !== 'date' && allStyles.has(style)) {
+                        breakdowns[year][style] = (breakdowns[year][style] || 0) + count;
+                    }
+                });
+            });
+
+            // Calculate percentages for each style in each year
+            Object.keys(breakdowns).forEach(year => {
+                const total = Object.values(breakdowns[year]).reduce((sum, count) => sum + count, 0);
+                const stylePercentages = {};
+                Object.entries(breakdowns[year]).forEach(([style, count]) => {
+                    if (count > 0) {  // Only include styles with non-zero counts
+                        stylePercentages[style] = {
+                            count,
+                            percentage: ((count / total) * 100).toFixed(1)
+                        };
+                    }
+                });
+                breakdowns[year] = stylePercentages;
+            });
+
+            setYearlyStyleBreakdowns(breakdowns);
 
             const totals = Object.entries(yearlyStats).map(([year, stats]) => ({
                 year,
@@ -93,7 +143,6 @@ function StyleTrendsChart({ data }) {
         'emo style': '#424242'
     };
 
-    const styles = Object.keys(colors);
     const width = 800;
     const height = 400;
     const margin = { top: 20, right: 80, bottom: 50, left: 50 };
@@ -104,7 +153,7 @@ function StyleTrendsChart({ data }) {
     const getY = (value, maxValue) => chartHeight - (value / maxValue) * chartHeight;
 
     const maxValue = chartData.length > 0 ? 
-        Math.max(...chartData.flatMap(d => styles.map(style => d[style]))) : 0;
+        Math.max(...chartData.flatMap(d => activeStyles.map(style => d[style]))) : 0;
 
     const generatePath = (style) => {
         return chartData.map((d, i) => {
@@ -114,69 +163,64 @@ function StyleTrendsChart({ data }) {
         }).join(' ');
     };
 
-    return React.createElement('div', { className: 'space-y-8 p-4' }, [
+    return React.createElement('div', { 
+        className: 'w-full space-y-8 p-4'
+    }, [
         React.createElement('div', { 
             key: 'chart-section',
-            className: 'bg-white rounded-lg shadow p-4' 
+            className: 'w-full bg-gray-800 rounded-lg shadow p-4'
         }, [
             React.createElement('h2', { 
                 key: 'title',
-                className: 'text-2xl font-bold mb-4' 
+                className: 'text-2xl font-bold mb-4 text-pink-500'
             }, 'Style Evolution'),
             React.createElement('div', { 
                 key: 'chart-container',
-                className: 'relative h-96' 
+                className: 'relative h-96'
             }, [
-                // Main SVG Chart
                 React.createElement('svg', { 
                     width: width,
                     height: height,
                     className: 'overflow-visible'
                 }, [
-                    // Translate the chart to account for margins
                     React.createElement('g', {
                         transform: \`translate(\${margin.left}, \${margin.top})\`
                     }, [
-                        // Y-axis grid lines and labels
                         ...[...Array(6)].map((_, i) => {
                             const y = (chartHeight / 5) * i;
                             const value = Math.round(maxValue - (maxValue / 5) * i);
                             return React.createElement('g', { key: \`grid-\${i}\` }, [
-                                // Grid line
                                 React.createElement('line', {
                                     key: \`grid-line-\${i}\`,
                                     x1: 0,
                                     y1: y,
                                     x2: chartWidth,
                                     y2: y,
-                                    stroke: '#e5e7eb',
+                                    stroke: '#4a5568',
                                     strokeDasharray: '4,4'
                                 }),
-                                // Y-axis label
                                 React.createElement('text', {
                                     key: \`grid-label-\${i}\`,
                                     x: -10,
                                     y: y,
                                     textAnchor: 'end',
                                     alignmentBaseline: 'middle',
-                                    className: 'text-xs text-gray-500'
+                                    className: 'text-xs text-pink-500'
                                 }, value)
                             ]);
                         }),
 
-                        // X-axis labels (dates)
                         ...chartData.map((d, i) => 
                             React.createElement('text', {
                                 key: \`x-label-\${i}\`,
                                 x: getX(i),
                                 y: chartHeight + 20,
                                 textAnchor: 'middle',
-                                className: 'text-xs text-gray-500'
+                                className: 'text-xs text-pink-500'
                             }, d.date)
                         ),
 
-                        // Draw a line for each style
-                        ...styles.map(style => 
+                        ...activeStyles.map(style => 
                             React.createElement('path', {
                                 key: \`line-\${style}\`,
                                 d: generatePath(style),
@@ -186,8 +230,7 @@ function StyleTrendsChart({ data }) {
                             })
                         ),
 
-                        // Draw points for each style
-                        ...styles.flatMap(style => 
+                        ...activeStyles.flatMap(style => 
                             chartData.map((d, i) => 
                                 React.createElement('circle', {
                                     key: \`point-\${style}-\${i}\`,
@@ -212,9 +255,8 @@ function StyleTrendsChart({ data }) {
                     ])
                 ]),
 
-                // Tooltip
                 activePoint && React.createElement('div', {
-                    className: 'absolute bg-white p-2 rounded shadow-lg text-sm',
+                    className: 'absolute bg-gray-700 p-2 rounded shadow-lg text-sm text-pink-500',
                     style: {
                         left: \`\${activePoint.x + margin.left}px\`,
                         top: \`\${activePoint.y + margin.top - 40}px\`,
@@ -228,14 +270,13 @@ function StyleTrendsChart({ data }) {
                 ])
             ]),
 
-            // Legend
             React.createElement('div', { 
                 key: 'legend',
-                className: 'flex flex-wrap gap-4 mt-4' 
-            }, styles.map(style => 
+                className: 'flex flex-wrap gap-4 mt-4'
+            }, activeStyles.map(style => 
                 React.createElement('div', { 
                     key: \`legend-\${style}\`,
-                    className: 'flex items-center'
+                    className: 'flex items-center text-gray-300'
                 }, [
                     React.createElement('div', {
                         key: \`color-\${style}\`,
@@ -247,34 +288,64 @@ function StyleTrendsChart({ data }) {
             ))
         ]),
 
-        // Year Summary Section
         React.createElement('div', { 
             key: 'summary-section',
-            className: 'bg-white rounded-lg shadow p-4' 
+            className: 'bg-gray-800 rounded-lg shadow p-4'
         }, [
             React.createElement('h2', { 
                 key: 'summary-title',
-                className: 'text-2xl font-bold mb-4' 
+                className: 'text-2xl font-bold mb-4 text-pink-500'
             }, 'Style Summary'),
             React.createElement('div', { 
                 key: 'summary-content',
-                className: 'space-y-4' 
-            }, yearlyTotals.map(({ year, total, dominantStyle, percentage }) =>
+                className: 'space-y-4'
+            }, yearlyTotals.map(({ year, total }) =>
                 React.createElement('div', {
                     key: \`year-\${year}\`,
-                    className: 'flex items-center justify-between p-4 border rounded-lg'
+                    className: 'bg-gray-700 rounded-lg transition-all duration-200 hover:bg-gray-600',
+                    onMouseEnter: () => setActiveYear(year),
+                    onMouseLeave: () => setActiveYear(null)
                 }, [
-                    React.createElement('div', { className: 'font-medium' }, year),
-                    React.createElement('div', { className: 'text-gray-600' }, 
-                        \`Total: \${total}\`
-                    ),
-                    React.createElement('div', { className: 'flex items-center gap-2' }, [
+                    React.createElement('div', {
+                        className: 'p-4 border border-gray-600 rounded-lg'
+                    }, [
+                        React.createElement('div', { 
+                            className: 'flex items-center justify-between mb-2'
+                        }, [
+                            React.createElement('div', { 
+                                className: 'font-medium text-pink-500'
+                            }, year),
+                            React.createElement('div', { 
+                                className: 'text-pink-500'
+                            }, \`Total Pins: \${total}\`)
+                        ]),
+                        activeYear === year && yearlyStyleBreakdowns[year] && 
                         React.createElement('div', {
-                            className: 'w-4 h-4 rounded-full',
-                            style: { backgroundColor: colors[dominantStyle] }
-                        }),
-                        React.createElement('span', null, 
-                            \`\${dominantStyle} (\${percentage}%)\`
+                            className: 'mt-4 space-y-2'
+                        }, 
+                            Object.entries(yearlyStyleBreakdowns[year])
+                                .sort(([, a], [, b]) => parseFloat(b.percentage) - parseFloat(a.percentage))
+                                .map(([style, data]) =>
+                                    React.createElement('div', {
+                                        key: \`\${year}-\${style}\`,
+                                        className: 'flex items-center justify-between text-sm'
+                                    }, [
+                                        React.createElement('div', {
+                                            className: 'flex items-center gap-2'
+                                        }, [
+                                            React.createElement('div', {
+                                                className: 'w-3 h-3 rounded-full',
+                                                style: { backgroundColor: colors[style] }
+                                            }),
+                                            React.createElement('span', {
+                                                className: 'text-gray-300'
+                                            }, style)
+                                        ]),
+                                        React.createElement('div', {
+                                            className: 'text-gray-400'
+                                        }, \`\${data.percentage}% (\${data.count} pins)\`)
+                                    ])
+                                )
                         )
                     ])
                 ])
@@ -292,6 +363,21 @@ function generateChart(data) {
         <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
         <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+        <style>
+            body {
+                background-color: #111827;  /* matches Tailwind's gray-900 */
+                color: #e5e5e5;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                justify-content: center;
+            }
+            #root {
+                background-color: #111827;
+                width: 100%;
+                max-width: 900px;
+            }
+        </style>
     </head>
     <body>
         <div id="root"></div>
